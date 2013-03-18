@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<script src="include/util.js"></script>
+		<script src="include/webutil.js"></script>
+		<script src="include/base64.js"></script>
+		<script src="include/websock.js"></script> 
+		<script type="text/javascript">
+			/* Precompute colormap */
+			var colormap = [];
+
+			for (i = 0; i < 256; i++) {
+				if( (i<43) )
+					colormap[i] = new Uint8ClampedArray([0, 0, Math.round(255*(i/43)), 255]);
+				if( (i>=43) && (i<87) )
+					colormap[i] = new Uint8ClampedArray([0, Math.round(255*(i-43)/43), 255, 255]);
+				if( (i>=87) && (i<120) )
+					colormap[i] = new Uint8ClampedArray([0, 255, Math.round(255-(255*(i-87)/32)), 255]);
+				if( (i>=120) && (i<154) )
+					colormap[i] = new Uint8ClampedArray([Math.round((255*(i-120)/33)), 255, 0, 255]);
+				if( (i>=154) && (i<217) )
+					colormap[i] = new Uint8ClampedArray([255, Math.round(255-(255*(i-154)/62)), 0, 255]);
+				if( (i>=217)  )
+					colormap[i] = new Uint8ClampedArray([255, 0, Math.round(128*(i-217)/38), 255]);
+			}
+		</script>
+		<style type="text/css">
+			body {
+				background-color: #4A4A4A;
+			}
+		</style>
+	</head>
+	<body>
+		<canvas id="linegraph" width="1024" height="256" style="border: 1px solid grey; background-color: #333333;"></canvas>
+		<canvas id="waterfall" width="1024" height="384" style="border: 1px solid grey;"></canvas>
+		<fieldset>
+			<legend>Frequency</legend>
+			<input type="text" value="99.4" id="freq">MHz&nbsp;<button onclick="set_freq(document.getElementById('freq').value * 1e6);">SET</button>
+		</fieldset>
+		<fieldset>
+			<legend>Websocket</legend>
+			<button onclick="ws.close();">CLOSE</button>
+		</fieldset>
+		<script type="text/javascript">
+			var linectx = document.getElementById('linegraph').getContext("2d");
+			var context = document.getElementById('waterfall').getContext("2d");
+
+			var cid = context.createImageData(1,1);
+
+			linectx.strokeStyle = '#5EFF00';
+			linectx.linewidth = 1;
+
+			function drawpixel(xpos, amplitude) {
+				window.cid.data.set(window.colormap[amplitude]);
+				window.context.putImageData(cid, xpos, 0);
+			}
+
+			function shift_canvas() {
+				var imageData = context.getImageData(0, 0, context.canvas.width, context.canvas.height-1);
+				window.context.putImageData(imageData, 0, 1);
+			}
+
+			function set_freq(num) {
+				var str = num + '';
+				//var bytes = [];
+				ws.send(0x00);
+				for (var i = 0; i < str.length; ++i) {
+					ws.send(str.charCodeAt(i));
+					//bytes.push(str.charCodeAt(i));
+				}
+				ws.send(0xFF);
+				//return bytes;
+			}
+
+			var ws = new Websock();
+			ws.open('ws://localhost:8080');
+
+			ws.on('open', function(){
+			  console.log('Connection open!');
+			});
+
+			ws.on('close', function(){
+			   console.log('Connection closed');
+			});
+
+			ws.on('error', function(error){
+			   console.log('Error detected: ' + error);
+			});
+
+			ws.on('message', function(e){
+				//while(ws.rQlen()) {
+				//	var server_message = ws.rQshift8();
+				//	console.log('MSG: ' +server_message);
+				//}
+				shift_canvas();
+				//window.context.clearRect(0, 0, window.context.canvas.width, 1);
+				window.linectx.clearRect(0, 0, window.linectx.canvas.width, window.linectx.canvas.height);
+				window.linectx.beginPath();
+				window.linectx.moveTo(0, 255 - ws.rQpeek8());
+				for (i = 0; i < 1024; i++) {
+					var a = ws.rQshift8();
+					window.linectx.lineTo(i, 255 - a);
+					drawpixel(i, a);
+				}
+				window.linectx.stroke();
+			});
+		</script>
+	</body>
+</html>
