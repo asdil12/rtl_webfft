@@ -11,3 +11,5 @@ Installation:
 
 
 ![Screenshot](http://i.imgur.com/DxPryek.png)
+
+This is based on [rtlizer](https://github.com/csete/rtlizer) and (for the FFT color precalculation) on [gqrx](https://github.com/csete/gqrx)
